@@ -243,7 +243,15 @@ show-version:
 	echo -n $(TAG)
 
 PLATFORMS ?= amd64 arm arm64
-BUILDX_PLATFORMS ?= linux/amd64,linux/arm,linux/arm64
+TARGET_PLATFORMS ?= linux/amd64,linux/arm,linux/arm64
+MACHINE := ingress-controller-builder
+
+.PHONY: buildx-machine
+buildx-machine: ensure-buildx
+	@docker buildx ls | grep $(MACHINE) || \
+		docker buildx create --name=$(MACHINE) --platform=$(TARGET_PLATFORMS)
+	@docker buildx use $(MACHINE)
+
 
 .PHONY: build-binaries
 build-binaries: clean
@@ -252,8 +260,7 @@ build-binaries: clean
 
 .PHONY: push-image
 push-image: REGISTRY=$(REPO)
-push-image: BUILDX_PLATFORMS=$(TARGET_PLATFORMS)
-push-image: ensure-buildx
+push-image: buildx-machine
 	docker buildx build \
 		--sbom=true \
 		--attest type=provenance,mode=max \
@@ -261,7 +268,7 @@ push-image: ensure-buildx
 		--no-cache \
 		--push \
 		--progress plain \
-		--platform $(BUILDX_PLATFORMS) \
+		--platform $(TARGET_PLATFORMS) \
 		--build-arg BASE_IMAGE="$(BASE_IMAGE)" \
 		--build-arg VERSION="$(TAG)" \
 		--build-arg COMMIT_SHA="$(COMMIT_SHA)" \
@@ -270,8 +277,7 @@ push-image: ensure-buildx
 
 .PHONY: push-chroot-image
 push-chroot-image: REGISTRY=$(REPO)
-push-chroot-image: BUILDX_PLATFORMS=$(TARGET_PLATFORMS)
-push-chroot-image: ensure-buildx
+push-chroot-image: buildx-machine
 	docker buildx build \
 		--sbom=true \
 		--attest type=provenance,mode=max \
@@ -279,7 +285,7 @@ push-chroot-image: ensure-buildx
 		--no-cache \
 		--push \
 		--progress plain \
-		--platform $(BUILDX_PLATFORMS)  \
+		--platform $(TARGET_PLATFORMS)  \
 		--build-arg BASE_IMAGE="$(BASE_IMAGE)" \
 		--build-arg VERSION="$(TAG)" \
 		--build-arg COMMIT_SHA="$(COMMIT_SHA)" \
